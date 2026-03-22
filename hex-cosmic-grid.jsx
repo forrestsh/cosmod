@@ -45,35 +45,32 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 //   iy: from (1, -1)  -> lower-right neighbor's oy
 //   iz: from (0, 1)   -> upper-right neighbor's oz
 
-const RADIUS = 9; // radius < 10, so 0..9 -> we use distance <= 9
+const DEFAULT_RADIUS = 9;
+const MAX_RADIUS = 30;
 const S3 = Math.sqrt(3);
 
-function generateNodes() {
+function generateGrid(radius) {
   const nodes = [];
-  const keySet = new Set();
-  for (let q = -RADIUS; q <= RADIUS; q++) {
-    for (let r = -RADIUS; r <= RADIUS; r++) {
+  const nodeIndex = {};
+
+  for (let q = -radius; q <= radius; q++) {
+    for (let r = -radius; r <= radius; r++) {
       // Cube coordinate s = -q - r
       const s = -q - r;
       // Hex distance from origin = max(|q|, |r|, |s|)
       const dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(s));
-      if (dist <= RADIUS) {
+      if (dist <= radius) {
         nodes.push({ q, r });
-        keySet.add(`${q},${r}`);
       }
     }
   }
-  return { nodes, keySet };
+
+  nodes.forEach((n, i) => {
+    nodeIndex[`${n.q},${n.r}`] = i;
+  });
+
+  return { nodes, nodeIndex };
 }
-
-const { nodes: ALL_NODES, keySet: NODE_SET } = generateNodes();
-const NODE_COUNT = ALL_NODES.length;
-
-// Create index map for fast lookup
-const nodeIndex = {};
-ALL_NODES.forEach((n, i) => {
-  nodeIndex[`${n.q},${n.r}`] = i;
-});
 
 // Output direction deltas
 const OX_DQ = 1, OX_DR = 0;   // right
@@ -85,7 +82,7 @@ const OZ_DQ = 0, OZ_DR = -1;  // lower-left
 // We'll use a simpler approach: if the neighbor is outside the grid, the signal is lost (0).
 // This is more physically meaningful for a disk shape.
 
-function getNeighborIndex(q, r, dq, dr) {
+function getNeighborIndex(q, r, dq, dr, nodeIndex) {
   const nq = q + dq;
   const nr = r + dr;
   const key = `${nq},${nr}`;
@@ -106,10 +103,10 @@ function axialToPixel(q, r) {
 // iy = signal arriving from lower-right neighbor's oy
 // iz = signal arriving from upper-right neighbor's oz
 
-function initState() {
+function initState(nodeCount) {
   // signals[i] = [ix, iy, iz] for node i
-  const signals = new Array(NODE_COUNT);
-  for (let i = 0; i < NODE_COUNT; i++) {
+  const signals = new Array(nodeCount);
+  for (let i = 0; i < nodeCount; i++) {
     signals[i] = [0, 0, 0];
   }
   return { signals, tick: 0 };
@@ -137,28 +134,29 @@ function applyRule(ix, iy, iz, rule) {
   return rule[idx];
 }
 
-function simulate(state, rule) {
+function simulate(state, rule, nodes, nodeIndex) {
   const { signals } = state;
-  const newSignals = new Array(NODE_COUNT);
-  for (let i = 0; i < NODE_COUNT; i++) {
+  const nodeCount = nodes.length;
+  const newSignals = new Array(nodeCount);
+  for (let i = 0; i < nodeCount; i++) {
     newSignals[i] = [0, 0, 0];
   }
 
-  for (let i = 0; i < NODE_COUNT; i++) {
-    const { q, r } = ALL_NODES[i];
-    const [ix, iy, iz] = signals[i];
+  for (let i = 0; i < nodeCount; i++) {
+    const { q, r } = nodes[i];
+    const [ix, iy, iz] = signals[i] ?? ZERO_SIGNAL;
     const [ox, oy, oz] = applyRule(ix, iy, iz, rule);
 
     // ox goes to neighbor at (q+1, r+0) -> becomes their ix
-    const oxTarget = getNeighborIndex(q, r, OX_DQ, OX_DR);
+    const oxTarget = getNeighborIndex(q, r, OX_DQ, OX_DR, nodeIndex);
     if (oxTarget >= 0) newSignals[oxTarget][0] = ox;
 
     // oy goes to neighbor at (q-1, r+1) -> becomes their iy
-    const oyTarget = getNeighborIndex(q, r, OY_DQ, OY_DR);
+    const oyTarget = getNeighborIndex(q, r, OY_DQ, OY_DR, nodeIndex);
     if (oyTarget >= 0) newSignals[oyTarget][1] = oy;
 
     // oz goes to neighbor at (q+0, r-1) -> becomes their iz
-    const ozTarget = getNeighborIndex(q, r, OZ_DQ, OZ_DR);
+    const ozTarget = getNeighborIndex(q, r, OZ_DQ, OZ_DR, nodeIndex);
     if (ozTarget >= 0) newSignals[ozTarget][2] = oz;
   }
 
@@ -179,34 +177,41 @@ const TEXT_MID = "#5a6068";
 
 const NODE_RADIUS = 10;
 const SIG_LEN = 6;
+const ZERO_SIGNAL = [0, 0, 0];
 
 export default function HexCosmicGrid() {
-  const [state, setState] = useState(initState);
+  const [radius, setRadius] = useState(DEFAULT_RADIUS);
+  const [pendingRadius, setPendingRadius] = useState(String(DEFAULT_RADIUS));
+  const [showSettings, setShowSettings] = useState(false);
   const [rule, setRule] = useState(defaultRule.map((r) => [...r]));
   const [running, setRunning] = useState(false);
+  const grid = useMemo(() => generateGrid(radius), [radius]);
+  const nodeCount = grid.nodes.length;
+  const [state, setState] = useState(() => initState(generateGrid(DEFAULT_RADIUS).nodes.length));
   const ruleRef = useRef(rule);
   ruleRef.current = rule;
 
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
-      setState((s) => simulate(s, ruleRef.current));
+      setState((s) => simulate(s, ruleRef.current, grid.nodes, grid.nodeIndex));
     }, 1000);
     return () => clearInterval(id);
-  }, [running]);
+  }, [running, grid]);
 
   const handleTick = useCallback(() => {
-    setState((s) => simulate(s, rule));
-  }, [rule]);
+    setState((s) => simulate(s, rule, grid.nodes, grid.nodeIndex));
+  }, [rule, grid]);
 
   const handleReset = useCallback(() => {
-    setState(initState());
+    setState(initState(nodeCount));
     setRunning(false);
-  }, []);
+  }, [nodeCount]);
 
   const toggleSignal = useCallback((nodeIdx, sigIdx) => {
     setState((s) => {
       const newSig = copySignals(s.signals);
+      if (!newSig[nodeIdx]) return s;
       newSig[nodeIdx][sigIdx] = newSig[nodeIdx][sigIdx] === 0 ? 1 : 0;
       return { ...s, signals: newSig };
     });
@@ -220,14 +225,25 @@ export default function HexCosmicGrid() {
     });
   }, []);
 
+  const applyRadius = useCallback(() => {
+    const parsed = Number.parseInt(pendingRadius, 10);
+    if (Number.isNaN(parsed)) return;
+    const next = Math.max(0, Math.min(MAX_RADIUS, parsed));
+    const nextGrid = generateGrid(next);
+    setRadius(next);
+    setState(initState(nextGrid.nodes.length));
+    setRunning(false);
+    setPendingRadius(String(next));
+  }, [pendingRadius]);
+
   // Compute pixel positions
   const positions = useMemo(() => {
-    return ALL_NODES.map((n) => axialToPixel(n.q, n.r));
-  }, []);
+    return grid.nodes.map((n) => axialToPixel(n.q, n.r));
+  }, [grid.nodes]);
 
   // SVG viewport
   const margin = 40;
-  const maxExtent = RADIUS * HEX_SIZE + margin;
+  const maxExtent = radius * HEX_SIZE + margin;
   const svgW = maxExtent * 2;
   const svgH = maxExtent * 2;
   const cx = maxExtent;
@@ -293,7 +309,7 @@ export default function HexCosmicGrid() {
         Hex Cosmic Grid
       </h1>
       <p style={{ fontSize: "10px", color: "#484e56", margin: "0 0 14px 0" }}>
-        {NODE_COUNT} nodes · radius {RADIUS} · 3-in 3-out · tick{" "}
+        {nodeCount} nodes · radius {radius} · hex distance ≤ radius · 3-in 3-out · tick{" "}
         <span style={{ color: SIG_ON }}>{state.tick}</span>
         {running && (
           <span style={{ color: "#e8a44e", marginLeft: "8px" }}>● auto</span>
@@ -397,7 +413,69 @@ export default function HexCosmicGrid() {
         >
           Reset
         </button>
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          style={{
+            ...btnBase,
+            background: showSettings ? "#1d1d2a" : "transparent",
+            color: "#9ca4b0",
+            border: "1px solid #22262e",
+          }}
+        >
+          Settings
+        </button>
       </div>
+
+      {showSettings && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginBottom: "10px",
+            background: "#0a0a12",
+            border: "1px solid #161620",
+            borderRadius: "8px",
+            padding: "8px 10px",
+            fontSize: "11px",
+          }}
+        >
+          <span style={{ color: "#7a828e" }}>Grid radius</span>
+          <input
+            type="number"
+            min={0}
+            max={MAX_RADIUS}
+            value={pendingRadius}
+            onChange={(e) => setPendingRadius(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyRadius();
+            }}
+            style={{
+              width: "72px",
+              background: "#0f1018",
+              color: "#c8ccd0",
+              border: "1px solid #22262e",
+              borderRadius: "6px",
+              padding: "6px 8px",
+              fontFamily: "inherit",
+              fontSize: "11px",
+            }}
+          />
+          <button
+            onClick={applyRadius}
+            style={{
+              ...btnBase,
+              background: "#1a2a3a",
+              color: "#4ea4e8",
+              border: "1px solid #2a3a4a",
+              padding: "6px 10px",
+              fontSize: "10px",
+            }}
+          >
+            Apply
+          </button>
+        </div>
+      )}
 
       <p style={{ fontSize: "8px", color: "#2a2e38", margin: "0 0 10px 0", textAlign: "center" }}>
         Click signal lines to toggle · Click rule digits to edit ·{" "}
@@ -415,7 +493,7 @@ export default function HexCosmicGrid() {
           style={{ display: "block" }}
         >
           {/* Edges (wire lines between nodes) */}
-          {ALL_NODES.map((node, i) => {
+          {grid.nodes.map((node, i) => {
             const px = cx + positions[i].x;
             const py = cy + positions[i].y;
             const edges = [];
@@ -427,7 +505,7 @@ export default function HexCosmicGrid() {
               { dq: OZ_DQ, dr: OZ_DR },
             ];
             outDirs.forEach(({ dq, dr }, di) => {
-              const ni = getNeighborIndex(node.q, node.r, dq, dr);
+              const ni = getNeighborIndex(node.q, node.r, dq, dr, grid.nodeIndex);
               if (ni >= 0) {
                 const npx = cx + positions[ni].x;
                 const npy = cy + positions[ni].y;
@@ -448,10 +526,10 @@ export default function HexCosmicGrid() {
           })}
 
           {/* Nodes */}
-          {ALL_NODES.map((node, i) => {
+          {grid.nodes.map((node, i) => {
             const px = cx + positions[i].x;
             const py = cy + positions[i].y;
-            const [ix, iy, iz] = state.signals[i];
+            const [ix, iy, iz] = state.signals[i] ?? ZERO_SIGNAL;
             const hasInput = ix || iy || iz;
             const isOrigin = node.q === 0 && node.r === 0;
 
@@ -481,10 +559,10 @@ export default function HexCosmicGrid() {
           })}
 
           {/* Signal indicators */}
-          {ALL_NODES.map((node, i) => {
+          {grid.nodes.map((node, i) => {
             const px = cx + positions[i].x;
             const py = cy + positions[i].y;
-            const [ix, iy, iz] = state.signals[i];
+            const [ix, iy, iz] = state.signals[i] ?? ZERO_SIGNAL;
 
             const sigColors = [SIG_ON, "#e8a44e", "#a44ee8"];
             const sigVals = [ix, iy, iz];
@@ -541,7 +619,7 @@ export default function HexCosmicGrid() {
           <circle
             cx={cx}
             cy={cy}
-            r={RADIUS * HEX_SIZE + 2}
+            r={radius * HEX_SIZE + 2}
             fill="none"
             stroke="#1a1a24"
             strokeWidth={0.5}
@@ -558,7 +636,7 @@ export default function HexCosmicGrid() {
           color: "#3a3e48",
         }}
       >
-        signals on: <span style={{ color: SIG_ON }}>{totalOn}</span> / {NODE_COUNT * 3}
+        signals on: <span style={{ color: SIG_ON }}>{totalOn}</span> / {nodeCount * 3}
       </div>
     </div>
   );
