@@ -183,6 +183,7 @@ export default function HexCosmicGrid() {
   const [radius, setRadius] = useState(DEFAULT_RADIUS);
   const [pendingRadius, setPendingRadius] = useState(String(DEFAULT_RADIUS));
   const [showSettings, setShowSettings] = useState(false);
+  const [signalLineOrientation, setSignalLineOrientation] = useState("perpendicular");
   const [rule, setRule] = useState(defaultRule.map((r) => [...r]));
   const [running, setRunning] = useState(false);
   const grid = useMemo(() => generateGrid(radius), [radius]);
@@ -432,6 +433,7 @@ export default function HexCosmicGrid() {
             display: "flex",
             alignItems: "center",
             gap: "8px",
+            flexWrap: "wrap",
             marginBottom: "10px",
             background: "#0a0a12",
             border: "1px solid #161620",
@@ -473,6 +475,33 @@ export default function HexCosmicGrid() {
             }}
           >
             Apply
+          </button>
+          <span style={{ color: "#7a828e", marginLeft: "6px" }}>Signal line</span>
+          <button
+            onClick={() => setSignalLineOrientation("perpendicular")}
+            style={{
+              ...btnBase,
+              background: signalLineOrientation === "perpendicular" ? "#1d1d2a" : "transparent",
+              color: signalLineOrientation === "perpendicular" ? "#c8ccd0" : "#66707c",
+              border: "1px solid #22262e",
+              padding: "6px 10px",
+              fontSize: "10px",
+            }}
+          >
+            Perpendicular
+          </button>
+          <button
+            onClick={() => setSignalLineOrientation("direction")}
+            style={{
+              ...btnBase,
+              background: signalLineOrientation === "direction" ? "#1d1d2a" : "transparent",
+              color: signalLineOrientation === "direction" ? "#c8ccd0" : "#66707c",
+              border: "1px solid #22262e",
+              padding: "6px 10px",
+              fontSize: "10px",
+            }}
+          >
+            True direction
           </button>
         </div>
       )}
@@ -576,6 +605,9 @@ export default function HexCosmicGrid() {
                   const offset = NODE_RADIUS + SIG_LEN + 2;
                   const mx = px + dir.ux * offset;
                   const my = py + dir.uy * offset;
+                  const lineU = signalLineOrientation === "direction"
+                    ? { x: dir.ux, y: dir.uy }
+                    : { x: -dir.uy, y: dir.ux };
 
                   return (
                     <g
@@ -588,22 +620,22 @@ export default function HexCosmicGrid() {
                       {/* Glow */}
                       {val === 1 && (
                         <line
-                          x1={mx - dir.uy * (SIG_LEN + 1)}
-                          y1={my + dir.ux * (SIG_LEN + 1)}
-                          x2={mx + dir.uy * (SIG_LEN + 1)}
-                          y2={my - dir.ux * (SIG_LEN + 1)}
+                          x1={mx - lineU.x * (SIG_LEN + 1)}
+                          y1={my - lineU.y * (SIG_LEN + 1)}
+                          x2={mx + lineU.x * (SIG_LEN + 1)}
+                          y2={my + lineU.y * (SIG_LEN + 1)}
                           stroke={col}
                           strokeWidth={7}
                           strokeLinecap="round"
                           opacity={0.2}
                         />
                       )}
-                      {/* Signal line: perpendicular to direction */}
+                      {/* Signal line orientation is configurable in Settings */}
                       <line
-                        x1={mx - dir.uy * SIG_LEN}
-                        y1={my + dir.ux * SIG_LEN}
-                        x2={mx + dir.uy * SIG_LEN}
-                        y2={my - dir.ux * SIG_LEN}
+                        x1={mx - lineU.x * SIG_LEN}
+                        y1={my - lineU.y * SIG_LEN}
+                        x2={mx + lineU.x * SIG_LEN}
+                        y2={my + lineU.y * SIG_LEN}
                         stroke={val ? col : SIG_OFF}
                         strokeWidth={val ? 2.5 : 1.5}
                         strokeLinecap="round"
