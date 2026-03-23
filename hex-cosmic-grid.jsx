@@ -226,6 +226,10 @@ export default function HexCosmicGrid() {
     });
   }, []);
 
+  const flipRule = useCallback(() => {
+    setRule((prev) => prev.map((outs) => outs.map((v) => (v === 0 ? 1 : 0))));
+  }, []);
+
   const applyRadius = useCallback(() => {
     const parsed = Number.parseInt(pendingRadius, 10);
     if (Number.isNaN(parsed)) return;
@@ -475,6 +479,20 @@ export default function HexCosmicGrid() {
             }}
           >
             Apply
+          </button>
+          <span style={{ color: "#7a828e", marginLeft: "6px" }}>Rule</span>
+          <button
+            onClick={flipRule}
+            style={{
+              ...btnBase,
+              background: "transparent",
+              color: "#c8ccd0",
+              border: "1px solid #22262e",
+              padding: "6px 10px",
+              fontSize: "10px",
+            }}
+          >
+            Flipping (0↔1)
           </button>
           <span style={{ color: "#7a828e", marginLeft: "6px" }}>Signal line</span>
           <button
