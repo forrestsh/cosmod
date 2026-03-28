@@ -121,13 +121,53 @@ function copySignals(s) {
 const defaultRule = [
   [0, 0, 0], // 000 -> 000
   [1, 1, 1], // 001 -> 111
-  [1, 0, 1], // 010 -> 101
-  [0, 1, 0], // 011 -> 010
-  [1, 1, 0], // 100 -> 110
-  [1, 0, 0], // 101 -> 100
-  [0, 0, 1], // 110 -> 001
+  [0, 1, 1], // 010 -> 011
+  [1, 0, 0], // 011 -> 100
+  [1, 0, 1], // 100 -> 101
+  [0, 0, 1], // 101 -> 001
+  [0, 1, 0], // 110 -> 010
+  [1, 1, 0], // 111 -> 110
+];
+
+const oddEvenRule = [
+  [0, 0, 0], // 000 -> 000
+  [1, 1, 1], // 001 -> 111
+  [1, 1, 1], // 010 -> 111
+  [0, 0, 0], // 011 -> 000
+  [1, 1, 1], // 100 -> 111
+  [0, 0, 0], // 101 -> 000
+  [0, 0, 0], // 110 -> 000
+  [1, 1, 1], // 111 -> 111
+];
+
+const xCircleRule = [
+  [0, 0, 0], // 000 -> 000
+  [1, 0, 1], // 001 -> 101
+  [1, 1, 0], // 010 -> 110
+  [0, 0, 1], // 011 -> 001
+  [1, 1, 1], // 100 -> 111
+  [0, 1, 0], // 101 -> 010
+  [1, 0, 0], // 110 -> 100
   [0, 1, 1], // 111 -> 011
 ];
+
+const yCircleRule = [
+  [0, 0, 0], // 000 -> 000
+  [0, 1, 1], // 001 -> 011
+  [1, 1, 1], // 010 -> 111
+  [1, 0, 0], // 011 -> 100
+  [1, 1, 0], // 100 -> 110
+  [0, 0, 1], // 101 -> 001
+  [0, 1, 0], // 110 -> 010
+  [1, 0, 1], // 111 -> 101
+];
+
+const rulePresets = {
+  "Default": defaultRule,
+  "Odd-Even": oddEvenRule,
+  "x-circle": xCircleRule,
+  "y-circle": yCircleRule,
+};
 
 function applyRule(ix, iy, iz, rule) {
   const idx = (ix << 2) | (iy << 1) | iz;
@@ -228,6 +268,12 @@ export default function HexCosmicGrid() {
 
   const flipRule = useCallback(() => {
     setRule((prev) => prev.map((outs) => outs.map((v) => (v === 0 ? 1 : 0))));
+  }, []);
+
+  const applyPresetRule = useCallback((presetName) => {
+    const preset = rulePresets[presetName];
+    if (!preset) return;
+    setRule(preset.map((outs) => [...outs]));
   }, []);
 
   const applyRadius = useCallback(() => {
@@ -494,6 +540,22 @@ export default function HexCosmicGrid() {
           >
             Flipping (0↔1)
           </button>
+          {Object.keys(rulePresets).map((presetName) => (
+            <button
+              key={presetName}
+              onClick={() => applyPresetRule(presetName)}
+              style={{
+                ...btnBase,
+                background: "transparent",
+                color: "#c8ccd0",
+                border: "1px solid #22262e",
+                padding: "6px 10px",
+                fontSize: "10px",
+              }}
+            >
+              {presetName}
+            </button>
+          ))}
           <span style={{ color: "#7a828e", marginLeft: "6px" }}>Signal line</span>
           <button
             onClick={() => setSignalLineOrientation("perpendicular")}
