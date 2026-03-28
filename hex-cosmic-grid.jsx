@@ -36,14 +36,11 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 //    axial (1,-1) -> Cartesian (1/2, -√3/2) ✓
 // Perfect! Axial (q,r) maps directly to user's hex directions.
 
-// Output directions (axial deltas):
-//   ox: (1, 0)   -> right
-//   oy: (-1, 1)  -> upper-left
-//   oz: (0, -1)  -> lower-left
-// Input directions (from the opposite neighbors):
-//   ix: from (-1, 0)  -> left neighbor's ox
-//   iy: from (1, -1)  -> lower-right neighbor's oy
-//   iz: from (0, 1)   -> upper-right neighbor's oz
+// CM-1 port geometry (docs/CM-1.md), axial (q,r); user x-right y-up.
+// Positive outputs ox+, oy+, oz+ step to neighbor Δ(q,r); inputs arrive from opposite neighbor.
+//   ix+: L→R / ix−: R→L     — edge Δ(±1, 0)
+//   iy+: lower-right→upper-left / iy−: upper-left→lower-right — edge Δ(∓1, ±1)
+//   iz+: upper-right→lower-left / iz−: lower-left→upper-right — edge Δ(0, ∓1)
 
 const DEFAULT_RADIUS = 9;
 const MAX_RADIUS = 30;
@@ -72,10 +69,13 @@ function generateGrid(radius) {
   return { nodes, nodeIndex };
 }
 
-// Output direction deltas
-const OX_DQ = 1, OX_DR = 0;   // right
-const OY_DQ = -1, OY_DR = 1;  // upper-left
-const OZ_DQ = 0, OZ_DR = -1;  // lower-left
+// Positive-output neighbor deltas (ox+, oy+, oz+)
+const OX_DQ = 1,
+  OX_DR = 0; // +x / left→right
+const OY_DQ = -1,
+  OY_DR = 1; // toward upper-left neighbor: lower-right→upper-left
+const OZ_DQ = 0,
+  OZ_DR = -1; // toward lower-left neighbor: upper-right→lower-left
 
 // For toroidal wrapping on a hex grid, we need to find the "wrapped" neighbor.
 // Since we have a hex disk (not a parallelogram), true toroidal wrapping is non-trivial.
@@ -98,16 +98,14 @@ function axialToPixel(q, r) {
   return { x, y };
 }
 
-// Signal state: for each node, 3 input signals (ix, iy, iz)
-// ix = signal arriving from left neighbor's ox
-// iy = signal arriving from lower-right neighbor's oy
-// iz = signal arriving from upper-right neighbor's oz
+// Signal state: for each node, 6 inputs — [ix+, iy+, iz+, ix−, iy−, iz−]
+// Wire coupling (matching polarity on the shared edge): ox+→neighbor ix+, oy+→iy+, oz+→iz+
+// along +Δ; ox−→ix−, oy−→iy−, oz−→iz− along −Δ.
 
 function initState(nodeCount) {
-  // signals[i] = [ix, iy, iz] for node i
   const signals = new Array(nodeCount);
   for (let i = 0; i < nodeCount; i++) {
-    signals[i] = [0, 0, 0];
+    signals[i] = [0, 0, 0, 0, 0, 0];
   }
   return { signals, tick: 0 };
 }
@@ -116,8 +114,8 @@ function copySignals(s) {
   return s.map((a) => [...a]);
 }
 
-// Default rule: 3 inputs (ix, iy, iz) -> 3 outputs (ox, oy, oz)
-// 2^3 = 8 input combinations, each maps to [ox, oy, oz]
+// Each table: 8 rows (ix,iy,iz bits) → 3 outputs. rule+ rows use ix+,iy+,iz+ and cells are ox+,oy+,oz+.
+// rule− rows use ix−,iy−,iz− and cells are ox−,oy−,oz− (separate evalRule{Plus,Minus} in simulate).
 const defaultRule = [
   [0, 0, 0], // 000 -> 000
   [1, 1, 1], // 001 -> 111
@@ -169,35 +167,81 @@ const rulePresets = {
   "y-circle": yCircleRule,
 };
 
-function applyRule(ix, iy, iz, rule) {
-  const idx = (ix << 2) | (iy << 1) | iz;
-  return rule[idx];
+const ZERO_SIGNAL = [0, 0, 0, 0, 0, 0];
+
+/** Per-node inputs: + ports then − ports (CM-1 docs/CM-1.md). */
+const SIG_IXP = 0,
+  SIG_IYP = 1,
+  SIG_IZP = 2,
+  SIG_IXN = 3,
+  SIG_IYN = 4,
+  SIG_IZN = 5;
+
+function ruleRowIndex(ix, iy, iz) {
+  return (ix << 2) | (iy << 1) | iz;
 }
 
-function simulate(state, rule, nodes, nodeIndex) {
+/** rule+: [ix+, iy+, iz+] → [ox+, oy+, oz+] — only + outputs; never ox−/oy−/oz−. */
+function evalRulePlus(ixPlus, iyPlus, izPlus, table) {
+  return table[ruleRowIndex(ixPlus, iyPlus, izPlus)];
+}
+
+/** rule−: [ix−, iy−, iz−] → [ox−, oy−, oz−] — only − outputs; never ox+/oy+/oz+. */
+function evalRuleMinus(ixMinus, iyMinus, izMinus, table) {
+  return table[ruleRowIndex(ixMinus, iyMinus, izMinus)];
+}
+
+/** ox+, oy+, oz+ → neighbor in +Δ receives ix+, iy+, iz+ (same polarity on that edge). */
+function sendPlusOutputsToNeighbors(q, r, oxPlus, oyPlus, ozPlus, nodeIndex, into) {
+  let t = getNeighborIndex(q, r, OX_DQ, OX_DR, nodeIndex);
+  if (t >= 0) into[t][SIG_IXP] = oxPlus;
+
+  t = getNeighborIndex(q, r, OY_DQ, OY_DR, nodeIndex);
+  if (t >= 0) into[t][SIG_IYP] = oyPlus;
+
+  t = getNeighborIndex(q, r, OZ_DQ, OZ_DR, nodeIndex);
+  if (t >= 0) into[t][SIG_IZP] = ozPlus;
+}
+
+/** ox−, oy−, oz− → neighbor in −Δ receives ix−, iy−, iz−. */
+function sendMinusOutputsToNeighbors(q, r, oxMinus, oyMinus, ozMinus, nodeIndex, into) {
+  let t = getNeighborIndex(q, r, -OX_DQ, -OX_DR, nodeIndex);
+  if (t >= 0) into[t][SIG_IXN] = oxMinus;
+
+  t = getNeighborIndex(q, r, -OY_DQ, -OY_DR, nodeIndex);
+  if (t >= 0) into[t][SIG_IYN] = oyMinus;
+
+  t = getNeighborIndex(q, r, -OZ_DQ, -OZ_DR, nodeIndex);
+  if (t >= 0) into[t][SIG_IZN] = ozMinus;
+}
+
+function simulate(state, rulePlus, ruleMinus, nodes, nodeIndex) {
   const { signals } = state;
   const nodeCount = nodes.length;
   const newSignals = new Array(nodeCount);
   for (let i = 0; i < nodeCount; i++) {
-    newSignals[i] = [0, 0, 0];
+    newSignals[i] = [0, 0, 0, 0, 0, 0];
   }
 
   for (let i = 0; i < nodeCount; i++) {
     const { q, r } = nodes[i];
-    const [ix, iy, iz] = signals[i] ?? ZERO_SIGNAL;
-    const [ox, oy, oz] = applyRule(ix, iy, iz, rule);
+    const sig = signals[i] ?? ZERO_SIGNAL;
 
-    // ox goes to neighbor at (q+1, r+0) -> becomes their ix
-    const oxTarget = getNeighborIndex(q, r, OX_DQ, OX_DR, nodeIndex);
-    if (oxTarget >= 0) newSignals[oxTarget][0] = ox;
+    const [oxPlus, oyPlus, ozPlus] = evalRulePlus(
+      sig[SIG_IXP],
+      sig[SIG_IYP],
+      sig[SIG_IZP],
+      rulePlus
+    );
+    const [oxMinus, oyMinus, ozMinus] = evalRuleMinus(
+      sig[SIG_IXN],
+      sig[SIG_IYN],
+      sig[SIG_IZN],
+      ruleMinus
+    );
 
-    // oy goes to neighbor at (q-1, r+1) -> becomes their iy
-    const oyTarget = getNeighborIndex(q, r, OY_DQ, OY_DR, nodeIndex);
-    if (oyTarget >= 0) newSignals[oyTarget][1] = oy;
-
-    // oz goes to neighbor at (q+0, r-1) -> becomes their iz
-    const ozTarget = getNeighborIndex(q, r, OZ_DQ, OZ_DR, nodeIndex);
-    if (ozTarget >= 0) newSignals[ozTarget][2] = oz;
+    sendPlusOutputsToNeighbors(q, r, oxPlus, oyPlus, ozPlus, nodeIndex, newSignals);
+    sendMinusOutputsToNeighbors(q, r, oxMinus, oyMinus, ozMinus, nodeIndex, newSignals);
   }
 
   return { signals: newSignals, tick: state.tick + 1 };
@@ -217,32 +261,37 @@ const TEXT_MID = "#5a6068";
 
 const NODE_RADIUS = 10;
 const SIG_LEN = 6;
-const ZERO_SIGNAL = [0, 0, 0];
+
+function cloneRuleTable(r) {
+  return r.map((row) => [...row]);
+}
 
 export default function HexCosmicGrid() {
   const [radius, setRadius] = useState(DEFAULT_RADIUS);
   const [pendingRadius, setPendingRadius] = useState(String(DEFAULT_RADIUS));
   const [showSettings, setShowSettings] = useState(false);
   const [signalLineOrientation, setSignalLineOrientation] = useState("perpendicular");
-  const [rule, setRule] = useState(defaultRule.map((r) => [...r]));
+  const [rulePlus, setRulePlus] = useState(() => cloneRuleTable(defaultRule));
+  const [ruleMinus, setRuleMinus] = useState(() => cloneRuleTable(defaultRule));
   const [running, setRunning] = useState(false);
   const grid = useMemo(() => generateGrid(radius), [radius]);
   const nodeCount = grid.nodes.length;
   const [state, setState] = useState(() => initState(generateGrid(DEFAULT_RADIUS).nodes.length));
-  const ruleRef = useRef(rule);
-  ruleRef.current = rule;
+  const rulesRef = useRef({ plus: rulePlus, minus: ruleMinus });
+  rulesRef.current = { plus: rulePlus, minus: ruleMinus };
 
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
-      setState((s) => simulate(s, ruleRef.current, grid.nodes, grid.nodeIndex));
+      const { plus, minus } = rulesRef.current;
+      setState((s) => simulate(s, plus, minus, grid.nodes, grid.nodeIndex));
     }, 1000);
     return () => clearInterval(id);
   }, [running, grid]);
 
   const handleTick = useCallback(() => {
-    setState((s) => simulate(s, rule, grid.nodes, grid.nodeIndex));
-  }, [rule, grid]);
+    setState((s) => simulate(s, rulePlus, ruleMinus, grid.nodes, grid.nodeIndex));
+  }, [rulePlus, ruleMinus, grid]);
 
   const handleReset = useCallback(() => {
     setState(initState(nodeCount));
@@ -258,22 +307,40 @@ export default function HexCosmicGrid() {
     });
   }, []);
 
-  const updateRule = useCallback((ruleIdx, outIdx) => {
-    setRule((prev) => {
+  const updateRulePlus = useCallback((ruleIdx, outIdx) => {
+    setRulePlus((prev) => {
       const next = prev.map((r) => [...r]);
       next[ruleIdx][outIdx] = next[ruleIdx][outIdx] === 0 ? 1 : 0;
       return next;
     });
   }, []);
 
-  const flipRule = useCallback(() => {
-    setRule((prev) => prev.map((outs) => outs.map((v) => (v === 0 ? 1 : 0))));
+  const updateRuleMinus = useCallback((ruleIdx, outIdx) => {
+    setRuleMinus((prev) => {
+      const next = prev.map((r) => [...r]);
+      next[ruleIdx][outIdx] = next[ruleIdx][outIdx] === 0 ? 1 : 0;
+      return next;
+    });
   }, []);
 
-  const applyPresetRule = useCallback((presetName) => {
+  const flipRulePlus = useCallback(() => {
+    setRulePlus((prev) => prev.map((outs) => outs.map((v) => (v === 0 ? 1 : 0))));
+  }, []);
+
+  const flipRuleMinus = useCallback(() => {
+    setRuleMinus((prev) => prev.map((outs) => outs.map((v) => (v === 0 ? 1 : 0))));
+  }, []);
+
+  const applyPresetRulePlus = useCallback((presetName) => {
     const preset = rulePresets[presetName];
     if (!preset) return;
-    setRule(preset.map((outs) => [...outs]));
+    setRulePlus(cloneRuleTable(preset));
+  }, []);
+
+  const applyPresetRuleMinus = useCallback((presetName) => {
+    const preset = rulePresets[presetName];
+    if (!preset) return;
+    setRuleMinus(cloneRuleTable(preset));
   }, []);
 
   const applyRadius = useCallback(() => {
@@ -300,16 +367,15 @@ export default function HexCosmicGrid() {
   const cx = maxExtent;
   const cy = maxExtent;
 
-  // Signal line directions in pixel space
-  // ix comes from (-1, 0) direction -> line points left
-  // iy comes from (1, -1) direction -> line points lower-right (in user coords), upper-right on screen
-  // iz comes from (0, 1) direction -> line points upper-right (in user coords), lower-right on screen
+  // Ticks sit on the side the input arrives from (unit step in axial coords toward source).
   const sigDirs = useMemo(() => {
-    // Input directions in axial, converted to pixel unit vectors
     const dirs = [
-      { dq: -1, dr: 0 },  // ix from left
-      { dq: 1, dr: -1 },  // iy from lower-right (user), screen: upper-right-ish
-      { dq: 0, dr: 1 },   // iz from upper-right (user), screen: lower-right-ish
+      { dq: -1, dr: 0 }, // ix+ from (−1,0); L→R
+      { dq: 1, dr: -1 }, // iy+ from (+1,−1); LR→UL
+      { dq: 0, dr: 1 }, // iz+ from (0,+1); UR→LL
+      { dq: 1, dr: 0 }, // ix−
+      { dq: -1, dr: 1 }, // iy−
+      { dq: 0, dr: -1 }, // iz−
     ];
     return dirs.map(({ dq, dr }) => {
       const px = HEX_SIZE * (dq + dr * 0.5);
@@ -332,7 +398,19 @@ export default function HexCosmicGrid() {
     textTransform: "uppercase",
   };
 
-  const totalOn = state.signals.reduce((sum, s) => sum + s[0] + s[1] + s[2], 0);
+  const totalOn = state.signals.reduce(
+    (sum, s) => sum + s[0] + s[1] + s[2] + s[3] + s[4] + s[5],
+    0
+  );
+
+  const sigColors = [
+    SIG_ON,
+    "#e8a44e",
+    "#a44ee8",
+    "#7ee4b8",
+    "#f0c088",
+    "#c49ef0",
+  ];
 
   return (
     <div
@@ -360,18 +438,19 @@ export default function HexCosmicGrid() {
         Hex Cosmic Grid
       </h1>
       <p style={{ fontSize: "10px", color: "#484e56", margin: "0 0 14px 0" }}>
-        {nodeCount} nodes · radius {radius} · hex distance ≤ radius · 3-in 3-out · tick{" "}
+        {nodeCount} nodes · radius {radius} · hex distance ≤ radius · 6-in 6-out · tick{" "}
         <span style={{ color: SIG_ON }}>{state.tick}</span>
         {running && (
           <span style={{ color: "#e8a44e", marginLeft: "8px" }}>● auto</span>
         )}
       </p>
 
-      {/* Rule editor */}
+      {/* Rule editors */}
       <div
         style={{
           display: "flex",
-          gap: "6px",
+          flexDirection: "column",
+          gap: "8px",
           marginBottom: "12px",
           background: "#0a0a12",
           border: "1px solid #161620",
@@ -380,49 +459,111 @@ export default function HexCosmicGrid() {
           alignItems: "center",
           flexWrap: "wrap",
           justifyContent: "center",
-          maxWidth: "700px",
+          maxWidth: "720px",
         }}
       >
-        <span
+        <div
           style={{
-            fontSize: "8px",
-            color: "#484e56",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            marginRight: "2px",
+            display: "flex",
+            gap: "6px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
-          Rule
-        </span>
-        {ruleLabels.map((label, idx) => (
-          <div
-            key={idx}
+          <span
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "2px",
-              fontSize: "11px",
+              fontSize: "8px",
+              color: "#5a9078",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              marginRight: "2px",
             }}
           >
-            <span style={{ color: "#2a2e38" }}>{label}→</span>
-            {[0, 1, 2].map((outIdx) => (
-              <span
-                key={outIdx}
-                onClick={() => updateRule(idx, outIdx)}
-                style={{
-                  cursor: "pointer",
-                  color: rule[idx][outIdx] ? SIG_ON : "#2a2e38",
-                  fontWeight: 700,
-                  userSelect: "none",
-                  transition: "color 0.15s",
-                  padding: "0 1px",
-                }}
-              >
-                {rule[idx][outIdx]}
-              </span>
-            ))}
-          </div>
-        ))}
+            Rule+{" "}
+            <span style={{ color: "#3a4a42", fontWeight: 400 }}>[ix+,iy+,iz+]→ox+,oy+,oz+</span>
+          </span>
+          {ruleLabels.map((label, idx) => (
+            <div
+              key={`p-${idx}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "2px",
+                fontSize: "11px",
+              }}
+            >
+              <span style={{ color: "#2a2e38" }}>{label}→</span>
+              {[0, 1, 2].map((outIdx) => (
+                <span
+                  key={outIdx}
+                  onClick={() => updateRulePlus(idx, outIdx)}
+                  style={{
+                    cursor: "pointer",
+                    color: rulePlus[idx][outIdx] ? SIG_ON : "#2a2e38",
+                    fontWeight: 700,
+                    userSelect: "none",
+                    transition: "color 0.15s",
+                    padding: "0 1px",
+                  }}
+                >
+                  {rulePlus[idx][outIdx]}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: "6px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "8px",
+              color: "#90705a",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              marginRight: "2px",
+            }}
+          >
+            Rule−{" "}
+            <span style={{ color: "#4a3a36", fontWeight: 400 }}>[ix−,iy−,iz−]→ox−,oy−,oz−</span>
+          </span>
+          {ruleLabels.map((label, idx) => (
+            <div
+              key={`m-${idx}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "2px",
+                fontSize: "11px",
+              }}
+            >
+              <span style={{ color: "#2a2e38" }}>{label}→</span>
+              {[0, 1, 2].map((outIdx) => (
+                <span
+                  key={outIdx}
+                  onClick={() => updateRuleMinus(idx, outIdx)}
+                  style={{
+                    cursor: "pointer",
+                    color: ruleMinus[idx][outIdx] ? "#e8a47a" : "#2a2e38",
+                    fontWeight: 700,
+                    userSelect: "none",
+                    transition: "color 0.15s",
+                    padding: "0 1px",
+                  }}
+                >
+                  {ruleMinus[idx][outIdx]}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Controls */}
@@ -526,9 +667,9 @@ export default function HexCosmicGrid() {
           >
             Apply
           </button>
-          <span style={{ color: "#7a828e", marginLeft: "6px" }}>Rule</span>
+          <span style={{ color: "#7a828e", marginLeft: "6px" }}>Rule+</span>
           <button
-            onClick={flipRule}
+            onClick={flipRulePlus}
             style={{
               ...btnBase,
               background: "transparent",
@@ -538,12 +679,12 @@ export default function HexCosmicGrid() {
               fontSize: "10px",
             }}
           >
-            Flipping (0↔1)
+            Flip+
           </button>
           {Object.keys(rulePresets).map((presetName) => (
             <button
-              key={presetName}
-              onClick={() => applyPresetRule(presetName)}
+              key={`p-${presetName}`}
+              onClick={() => applyPresetRulePlus(presetName)}
               style={{
                 ...btnBase,
                 background: "transparent",
@@ -553,7 +694,37 @@ export default function HexCosmicGrid() {
                 fontSize: "10px",
               }}
             >
-              {presetName}
+              + {presetName}
+            </button>
+          ))}
+          <span style={{ color: "#7a828e", marginLeft: "6px" }}>Rule−</span>
+          <button
+            onClick={flipRuleMinus}
+            style={{
+              ...btnBase,
+              background: "transparent",
+              color: "#c8ccd0",
+              border: "1px solid #22262e",
+              padding: "6px 10px",
+              fontSize: "10px",
+            }}
+          >
+            Flip−
+          </button>
+          {Object.keys(rulePresets).map((presetName) => (
+            <button
+              key={`m-${presetName}`}
+              onClick={() => applyPresetRuleMinus(presetName)}
+              style={{
+                ...btnBase,
+                background: "transparent",
+                color: "#c8ccd0",
+                border: "1px solid #22262e",
+                padding: "6px 10px",
+                fontSize: "10px",
+              }}
+            >
+              − {presetName}
             </button>
           ))}
           <span style={{ color: "#7a828e", marginLeft: "6px" }}>Signal line</span>
@@ -587,10 +758,10 @@ export default function HexCosmicGrid() {
       )}
 
       <p style={{ fontSize: "8px", color: "#2a2e38", margin: "0 0 10px 0", textAlign: "center" }}>
-        Click signal lines to toggle · Click rule digits to edit ·{" "}
-        <span style={{ color: SIG_ON }}>ix</span> left{" "}
-        <span style={{ color: "#e8a44e" }}>iy</span> lower-right{" "}
-        <span style={{ color: "#a44ee8" }}>iz</span> upper-right
+        CM-1 dirs · click ticks to toggle · Rule+/Rule− independent · +ports:{" "}
+        <span style={{ color: SIG_ON }}>L→R</span> ·{" "}
+        <span style={{ color: "#e8a44e" }}>LR→UL</span> ·{" "}
+        <span style={{ color: "#a44ee8" }}>UR→LL</span> · − ports reverse each
       </p>
 
       {/* Hex grid SVG */}
@@ -638,8 +809,8 @@ export default function HexCosmicGrid() {
           {grid.nodes.map((node, i) => {
             const px = cx + positions[i].x;
             const py = cy + positions[i].y;
-            const [ix, iy, iz] = state.signals[i] ?? ZERO_SIGNAL;
-            const hasInput = ix || iy || iz;
+            const [ixp, iyp, izp, ixn, iyn, izn] = state.signals[i] ?? ZERO_SIGNAL;
+            const hasInput = ixp || iyp || izp || ixn || iyn || izn;
             const isOrigin = node.q === 0 && node.r === 0;
 
             return (
@@ -655,13 +826,17 @@ export default function HexCosmicGrid() {
                 />
                 <text
                   x={px}
-                  y={py + 3}
-                  fontSize="6"
+                  y={py + 2}
+                  fontSize="5"
                   fill={hasInput ? TEXT_MID : TEXT_DIM}
                   textAnchor="middle"
                   fontFamily="inherit"
                 >
-                  {ix}{iy}{iz}
+                  {ixp}
+                  {iyp}
+                  {izp}|{ixn}
+                  {iyn}
+                  {izn}
                 </text>
               </g>
             );
@@ -671,10 +846,7 @@ export default function HexCosmicGrid() {
           {grid.nodes.map((node, i) => {
             const px = cx + positions[i].x;
             const py = cy + positions[i].y;
-            const [ix, iy, iz] = state.signals[i] ?? ZERO_SIGNAL;
-
-            const sigColors = [SIG_ON, "#e8a44e", "#a44ee8"];
-            const sigVals = [ix, iy, iz];
+            const sigVals = state.signals[i] ?? ZERO_SIGNAL;
 
             return (
               <g key={`sig-${i}`}>
@@ -748,7 +920,7 @@ export default function HexCosmicGrid() {
           color: "#3a3e48",
         }}
       >
-        signals on: <span style={{ color: SIG_ON }}>{totalOn}</span> / {nodeCount * 3}
+        signals on: <span style={{ color: SIG_ON }}>{totalOn}</span> / {nodeCount * 6}
       </div>
     </div>
   );
