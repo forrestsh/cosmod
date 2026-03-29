@@ -127,6 +127,18 @@ const defaultRule = [
   [1, 1, 0], // 111 -> 110
 ];
 
+/** CM-2 (docs/CM-2.md): [ix,iy,iz] → same triple for every row. */
+const identityRule = [
+  [0, 0, 0], // 000
+  [0, 0, 1], // 001
+  [0, 1, 0], // 010
+  [0, 1, 1], // 011
+  [1, 0, 0], // 100
+  [1, 0, 1], // 101
+  [1, 1, 0], // 110
+  [1, 1, 1], // 111
+];
+
 const oddEvenRule = [
   [0, 0, 0], // 000 -> 000
   [1, 1, 1], // 001 -> 111
@@ -162,6 +174,7 @@ const yCircleRule = [
 
 const rulePresets = {
   "Default": defaultRule,
+  Identity: identityRule,
   "Odd-Even": oddEvenRule,
   "x-circle": xCircleRule,
   "y-circle": yCircleRule,
