@@ -3,7 +3,36 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // ── Rule table: 4-bit input → 4-bit output ────────────────────────────────
 // Index = (ix+ iy+ ix- iy-) as 4-bit binary (ix+ is MSB)
 // Identity rule: output = input
-const DEFAULT_RULE = Array.from({ length: 16 }, (_, i) => i);
+function createIdentityRule() {
+  return Array.from({ length: 16 }, (_, i) => i);
+}
+
+function createOddEvenRule() {
+  return Array.from({ length: 16 }, (_, idx) => {
+    let ones = 0;
+    for (let bit = 0; bit < 4; bit++) {
+      ones += (idx >> bit) & 1;
+    }
+    return ones % 2 === 1 ? 0b1111 : 0b0000;
+  });
+}
+
+const RULE_PRESETS = [
+  {
+    id: "identity",
+    label: "Identity",
+    description: "Output equals input for each row.",
+    build: createIdentityRule,
+  },
+  {
+    id: "odd-even",
+    label: "Odd-Even",
+    description: "Odd count of 1s -> 1111, even -> 0000.",
+    build: createOddEvenRule,
+  },
+];
+
+const DEFAULT_RULE = createIdentityRule();
 
 const GRID = 10; // grid size
 const CELL = 54; // px per cell
@@ -149,6 +178,77 @@ const INPUT_LABELS = ["ix+", "iy+", "ix-", "iy-"];
 const OUTPUT_LABELS = ["ox+", "oy+", "ox-", "oy-"];
 const SIG_ORDER = ["ox+", "oy+", "ox-", "oy-"];
 
+function rulesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function getPresetForRule(rule) {
+  for (const preset of RULE_PRESETS) {
+    if (rulesEqual(rule, preset.build())) {
+      return preset;
+    }
+  }
+  return null;
+}
+
+function SettingsPanel({ activePresetId, onSelectPreset }) {
+  return (
+    <div style={{
+      background: "#0d1117",
+      border: "1px solid #30363d",
+      borderRadius: 8,
+      padding: "12px 14px",
+      fontSize: 11,
+      fontFamily: "monospace",
+      color: "#c9d1d9",
+      minWidth: 310,
+      maxWidth: 360
+    }}>
+      <div style={{ color: "#8b949e", marginBottom: 10, fontSize: 10, letterSpacing: 1 }}>
+        SETTINGS · PREDEFINED RULES
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {RULE_PRESETS.map((preset) => {
+          const active = activePresetId === preset.id;
+          return (
+            <button
+              key={preset.id}
+              onClick={() => onSelectPreset(preset.id)}
+              style={{
+                textAlign: "left",
+                background: active ? "#132334" : "#0d1117",
+                border: `1px solid ${active ? "#58a6ff" : "#30363d"}`,
+                color: active ? "#58a6ff" : "#c9d1d9",
+                borderRadius: 6,
+                padding: "8px 10px",
+                cursor: "pointer"
+              }}
+            >
+              <div style={{ fontWeight: 700, letterSpacing: 0.5 }}>
+                {active ? "● " : "○ "}
+                {preset.label}
+              </div>
+              <div style={{ marginTop: 3, color: "#8b949e", fontSize: 10 }}>
+                {preset.description}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 10, color: "#8b949e", fontSize: 10 }}>
+        Active preset:{" "}
+        <span style={{ color: "#c9d1d9" }}>
+          {RULE_PRESETS.find((p) => p.id === activePresetId)?.label ?? "Custom"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function RuleEditor({ rule, onRuleChange }) {
   return (
     <div style={{
@@ -209,9 +309,17 @@ export default function CosmicGrid4x4() {
   const [tick, setTick] = useState(0);
   const [speed, setSpeed] = useState(300);
   const [showRule, setShowRule] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [paintSig, setPaintSig] = useState("ox+");
   const [paintVal, setPaintVal] = useState(1);
   const intervalRef = useRef(null);
+  const activePreset = getPresetForRule(rule);
+
+  const applyPreset = useCallback((presetId) => {
+    const preset = RULE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setRule(preset.build());
+  }, []);
 
   const advance = useCallback(() => {
     setGrid(g => step(g, rule));
@@ -300,6 +408,9 @@ export default function CosmicGrid4x4() {
         <button onClick={advance} disabled={running} style={btnStyle("#69ff47")}>Step</button>
         <button onClick={randomize} style={btnStyle("#ffab40")}>Randomize</button>
         <button onClick={reset} style={btnStyle("#8b949e")}>Reset</button>
+        <button onClick={() => setShowSettings(s => !s)} style={btnStyle("#58a6ff")}>
+          {showSettings ? "Hide Settings" : "Settings"}
+        </button>
         <button onClick={() => setShowRule(r => !r)} style={btnStyle("#c9a0dc")}>
           {showRule ? "Hide Rule" : "Edit Rule"}
         </button>
@@ -373,6 +484,14 @@ export default function CosmicGrid4x4() {
             })
           )}
         </svg>
+
+        {/* Settings panel */}
+        {showSettings && (
+          <SettingsPanel
+            activePresetId={activePreset?.id ?? null}
+            onSelectPreset={applyPreset}
+          />
+        )}
 
         {/* Rule editor */}
         {showRule && <RuleEditor rule={rule} onRuleChange={setRule} />}
