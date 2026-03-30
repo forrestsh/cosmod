@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, Link } from "react-router-dom";
 import HomePage from "./HomePage.jsx";
 import HexCosmicGrid from "../hex-cosmic-grid.jsx";
 import CosmicGrid from "../cosmic-grid-toroidal.jsx";
+import CosmicGrid4x4 from "../cosmic-grid-4x4.jsx";
 
 const font =
   "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace";
@@ -59,6 +60,14 @@ export default function App() {
         element={
           <ModelShell>
             <CosmicGrid />
+          </ModelShell>
+        }
+      />
+      <Route
+        path="/4x4"
+        element={
+          <ModelShell>
+            <CosmicGrid4x4 />
           </ModelShell>
         }
       />
