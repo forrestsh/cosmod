@@ -63,7 +63,7 @@ function NodeSignals({ cx, cy, outputs }) {
   // ox+ (right-going): horizontal line right of centre inside circle
   if (outputs["ox+"]) {
     segments.push(
-      <line key="oxp" x1={cx - off * 0.6} y1={cy} x2={cx + off} y2={cy}
+      <line key="oxp" x1={cx} y1={cy} x2={cx + off} y2={cy}
         stroke={SIG_COLOR["ox+"]} strokeWidth={2.5} strokeLinecap="round" />,
       <polygon key="oxp-arr"
         points={`${cx + off},${cy - 3} ${cx + off + 5},${cy} ${cx + off},${cy + 3}`}
@@ -73,7 +73,7 @@ function NodeSignals({ cx, cy, outputs }) {
   // ox- (left-going)
   if (outputs["ox-"]) {
     segments.push(
-      <line key="oxm" x1={cx + off * 0.6} y1={cy} x2={cx - off} y2={cy}
+      <line key="oxm" x1={cx} y1={cy} x2={cx - off} y2={cy}
         stroke={SIG_COLOR["ox-"]} strokeWidth={2.5} strokeLinecap="round" />,
       <polygon key="oxm-arr"
         points={`${cx - off},${cy - 3} ${cx - off - 5},${cy} ${cx - off},${cy + 3}`}
@@ -83,7 +83,7 @@ function NodeSignals({ cx, cy, outputs }) {
   // oy+ (down-going)
   if (outputs["oy+"]) {
     segments.push(
-      <line key="oyp" x1={cx} y1={cy - off * 0.6} x2={cx} y2={cy + off}
+      <line key="oyp" x1={cx} y1={cy} x2={cx} y2={cy + off}
         stroke={SIG_COLOR["oy+"]} strokeWidth={2.5} strokeLinecap="round" />,
       <polygon key="oyp-arr"
         points={`${cx - 3},${cy + off} ${cx},${cy + off + 5} ${cx + 3},${cy + off}`}
@@ -93,7 +93,7 @@ function NodeSignals({ cx, cy, outputs }) {
   // oy- (up-going)
   if (outputs["oy-"]) {
     segments.push(
-      <line key="oym" x1={cx} y1={cy + off * 0.6} x2={cx} y2={cy - off}
+      <line key="oym" x1={cx} y1={cy} x2={cx} y2={cy - off}
         stroke={SIG_COLOR["oy-"]} strokeWidth={2.5} strokeLinecap="round" />,
       <polygon key="oym-arr"
         points={`${cx - 3},${cy - off} ${cx},${cy - off - 5} ${cx + 3},${cy - off}`}
