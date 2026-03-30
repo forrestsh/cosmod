@@ -452,7 +452,8 @@ export default function CosmicGrid4x4() {
     setTick(0);
   };
 
-  const SVG_SIZE = gridSize * CELL + 2;
+  const renderedGridSize = grid.length;
+  const SVG_SIZE = renderedGridSize * CELL + 2;
 
   return (
     <div style={{
@@ -544,7 +545,7 @@ export default function CosmicGrid4x4() {
           <rect width={SVG_SIZE} height={SVG_SIZE} fill="#0d1117" />
 
           {/* Grid lines */}
-          {Array.from({ length: gridSize + 1 }, (_, i) => (
+          {Array.from({ length: renderedGridSize + 1 }, (_, i) => (
             <g key={i}>
               <line x1={i * CELL + 1} y1={1} x2={i * CELL + 1} y2={SVG_SIZE - 1}
                 stroke="#161b22" strokeWidth={1} />
@@ -559,10 +560,10 @@ export default function CosmicGrid4x4() {
               const cx = c * CELL + CELL / 2 + 1;
               const cy = r * CELL + CELL / 2 + 1;
               // Compute inputs for this cell
-              const ixp = grid[r][(c - 1 + gridSize) % gridSize]["ox+"];
-              const ixm = grid[r][(c + 1) % gridSize]["ox-"];
-              const iyp = grid[(r - 1 + gridSize) % gridSize][c]["oy+"];
-              const iym = grid[(r + 1) % gridSize][c]["oy-"];
+              const ixp = grid[r][(c - 1 + renderedGridSize) % renderedGridSize]["ox+"];
+              const ixm = grid[r][(c + 1) % renderedGridSize]["ox-"];
+              const iyp = grid[(r - 1 + renderedGridSize) % renderedGridSize][c]["oy+"];
+              const iym = grid[(r + 1) % renderedGridSize][c]["oy-"];
               const anyOn = cell["ox+"] || cell["oy+"] || cell["ox-"] || cell["oy-"];
 
               return (
