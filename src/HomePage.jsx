@@ -177,8 +177,8 @@ export default function HomePage() {
               textTransform: "none",
             }}
           >
-            10×10 toroidal mesh with four directional signal channels and a
-            4-bit input/output rule editor.
+            Default 10×10 toroidal mesh (configurable 1-30) with four
+            directional signal channels and a 4-bit input/output rule editor.
           </span>
         </Link>
       </nav>

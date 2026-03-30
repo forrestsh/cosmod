@@ -34,7 +34,9 @@ const RULE_PRESETS = [
 
 const DEFAULT_RULE = createIdentityRule();
 
-const GRID = 10; // grid size
+const DEFAULT_GRID_SIZE = 10;
+const MIN_GRID_SIZE = 1;
+const MAX_GRID_SIZE = 30;
 const CELL = 54; // px per cell
 const R = 18;    // node circle radius
 
@@ -48,21 +50,22 @@ const SIG_COLOR = {
 
 const SIG_LABELS = ["ox+", "oy+", "ox-", "oy-"];
 
-function makeEmpty() {
-  return Array.from({ length: GRID }, () =>
-    Array.from({ length: GRID }, () => ({ "ox+": 0, "oy+": 0, "ox-": 0, "oy-": 0 }))
+function makeEmpty(size) {
+  return Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => ({ "ox+": 0, "oy+": 0, "ox-": 0, "oy-": 0 }))
   );
 }
 
 function step(grid, rule) {
-  const next = makeEmpty();
-  for (let r = 0; r < GRID; r++) {
-    for (let c = 0; c < GRID; c++) {
+  const size = grid.length;
+  const next = makeEmpty(size);
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       // Gather inputs from neighbours (toroidal)
-      const ixp = grid[r][(c - 1 + GRID) % GRID]["ox+"];  // left  neighbour's ox+
-      const ixm = grid[r][(c + 1) % GRID]["ox-"];          // right neighbour's ox-
-      const iyp = grid[(r - 1 + GRID) % GRID][c]["oy+"];   // top   neighbour's oy+
-      const iym = grid[(r + 1) % GRID][c]["oy-"];           // bottom neighbour's oy-
+      const ixp = grid[r][(c - 1 + size) % size]["ox+"];  // left  neighbour's ox+
+      const ixm = grid[r][(c + 1) % size]["ox-"];         // right neighbour's ox-
+      const iyp = grid[(r - 1 + size) % size][c]["oy+"];  // top   neighbour's oy+
+      const iym = grid[(r + 1) % size][c]["oy-"];         // bottom neighbour's oy-
 
       // bit order: ix+ iy+ ix- iy-
       const idx = (ixp << 3) | (iyp << 2) | (ixm << 1) | iym;
@@ -195,7 +198,15 @@ function getPresetForRule(rule) {
   return null;
 }
 
-function SettingsPanel({ activePresetId, onSelectPreset }) {
+function SettingsPanel({
+  activePresetId,
+  onSelectPreset,
+  currentGridSize,
+  pendingGridSize,
+  onPendingGridSizeChange,
+  onApplyGridSize,
+  gridSizeError,
+}) {
   return (
     <div style={{
       background: "#0d1117",
@@ -209,7 +220,7 @@ function SettingsPanel({ activePresetId, onSelectPreset }) {
       maxWidth: 360
     }}>
       <div style={{ color: "#8b949e", marginBottom: 10, fontSize: 10, letterSpacing: 1 }}>
-        SETTINGS · PREDEFINED RULES
+        SETTINGS · RULES + GRID SIZE
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {RULE_PRESETS.map((preset) => {
@@ -244,6 +255,65 @@ function SettingsPanel({ activePresetId, onSelectPreset }) {
         <span style={{ color: "#c9d1d9" }}>
           {RULE_PRESETS.find((p) => p.id === activePresetId)?.label ?? "Custom"}
         </span>
+      </div>
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 10,
+          borderTop: "1px solid #21262d",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <div style={{ color: "#8b949e", fontSize: 10 }}>
+          Grid size ({MIN_GRID_SIZE}-{MAX_GRID_SIZE}, default {DEFAULT_GRID_SIZE})
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="number"
+            min={MIN_GRID_SIZE}
+            max={MAX_GRID_SIZE}
+            step={1}
+            value={pendingGridSize}
+            onChange={(e) => onPendingGridSizeChange(e.target.value)}
+            style={{
+              width: 78,
+              background: "#0d1117",
+              border: "1px solid #30363d",
+              color: "#c9d1d9",
+              borderRadius: 4,
+              padding: "5px 6px",
+              fontSize: 11,
+              fontFamily: "monospace",
+            }}
+          />
+          <button
+            onClick={onApplyGridSize}
+            style={{
+              background: "#132334",
+              border: "1px solid #58a6ff",
+              color: "#58a6ff",
+              borderRadius: 4,
+              padding: "5px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+              fontFamily: "monospace",
+            }}
+          >
+            Apply
+          </button>
+          <span style={{ color: "#8b949e", fontSize: 10 }}>
+            Current: {currentGridSize}
+          </span>
+        </div>
+        {gridSizeError ? (
+          <div style={{ color: "#ff7b72", fontSize: 10 }}>{gridSizeError}</div>
+        ) : (
+          <div style={{ color: "#8b949e", fontSize: 10 }}>
+            Enter an integer from {MIN_GRID_SIZE} to {MAX_GRID_SIZE}.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -303,7 +373,10 @@ function RuleEditor({ rule, onRuleChange }) {
 
 // ── Main component ────────────────────────────────────────────────────────
 export default function CosmicGrid4x4() {
-  const [grid, setGrid] = useState(makeEmpty);
+  const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
+  const [grid, setGrid] = useState(() => makeEmpty(DEFAULT_GRID_SIZE));
+  const [pendingGridSize, setPendingGridSize] = useState(String(DEFAULT_GRID_SIZE));
+  const [gridSizeError, setGridSizeError] = useState("");
   const [rule, setRule] = useState(DEFAULT_RULE);
   const [running, setRunning] = useState(false);
   const [tick, setTick] = useState(0);
@@ -321,10 +394,32 @@ export default function CosmicGrid4x4() {
     setRule(preset.build());
   }, []);
 
+  const applyGridSize = useCallback(() => {
+    const raw = pendingGridSize.trim();
+    if (!/^\d+$/.test(raw)) {
+      setGridSizeError(`Grid size must be an integer from ${MIN_GRID_SIZE} to ${MAX_GRID_SIZE}.`);
+      return;
+    }
+    const parsed = Number.parseInt(raw, 10);
+    if (parsed < MIN_GRID_SIZE || parsed > MAX_GRID_SIZE) {
+      setGridSizeError(`Grid size must be between ${MIN_GRID_SIZE} and ${MAX_GRID_SIZE}.`);
+      return;
+    }
+    setGridSize(parsed);
+    setPendingGridSize(String(parsed));
+    setGridSizeError("");
+  }, [pendingGridSize]);
+
   const advance = useCallback(() => {
     setGrid(g => step(g, rule));
     setTick(t => t + 1);
   }, [rule]);
+
+  useEffect(() => {
+    setGrid(makeEmpty(gridSize));
+    setTick(0);
+    setRunning(false);
+  }, [gridSize]);
 
   useEffect(() => {
     if (running) {
@@ -343,11 +438,11 @@ export default function CosmicGrid4x4() {
     });
   };
 
-  const reset = () => { setGrid(makeEmpty()); setTick(0); setRunning(false); };
+  const reset = () => { setGrid(makeEmpty(gridSize)); setTick(0); setRunning(false); };
 
   const randomize = () => {
-    setGrid(Array.from({ length: GRID }, () =>
-      Array.from({ length: GRID }, () => ({
+    setGrid(Array.from({ length: gridSize }, () =>
+      Array.from({ length: gridSize }, () => ({
         "ox+": Math.random() > 0.7 ? 1 : 0,
         "oy+": Math.random() > 0.7 ? 1 : 0,
         "ox-": Math.random() > 0.7 ? 1 : 0,
@@ -357,7 +452,8 @@ export default function CosmicGrid4x4() {
     setTick(0);
   };
 
-  const SVG_SIZE = GRID * CELL + 2;
+  const renderedGridSize = grid.length;
+  const SVG_SIZE = renderedGridSize * CELL + 2;
 
   return (
     <div style={{
@@ -378,7 +474,7 @@ export default function CosmicGrid4x4() {
           textShadow: "0 0 20px #00e5ff44"
         }}>Cosmic Grid · 4×4</div>
         <div style={{ fontSize: 11, color: "#8b949e", letterSpacing: 2, marginTop: 4 }}>
-          TOROIDAL · {GRID}×{GRID} · TICK {tick}
+          TOROIDAL · {gridSize}×{gridSize} · TICK {tick}
         </div>
       </div>
 
@@ -449,7 +545,7 @@ export default function CosmicGrid4x4() {
           <rect width={SVG_SIZE} height={SVG_SIZE} fill="#0d1117" />
 
           {/* Grid lines */}
-          {Array.from({ length: GRID + 1 }, (_, i) => (
+          {Array.from({ length: renderedGridSize + 1 }, (_, i) => (
             <g key={i}>
               <line x1={i * CELL + 1} y1={1} x2={i * CELL + 1} y2={SVG_SIZE - 1}
                 stroke="#161b22" strokeWidth={1} />
@@ -464,10 +560,10 @@ export default function CosmicGrid4x4() {
               const cx = c * CELL + CELL / 2 + 1;
               const cy = r * CELL + CELL / 2 + 1;
               // Compute inputs for this cell
-              const ixp = grid[r][(c - 1 + GRID) % GRID]["ox+"];
-              const ixm = grid[r][(c + 1) % GRID]["ox-"];
-              const iyp = grid[(r - 1 + GRID) % GRID][c]["oy+"];
-              const iym = grid[(r + 1) % GRID][c]["oy-"];
+              const ixp = grid[r][(c - 1 + renderedGridSize) % renderedGridSize]["ox+"];
+              const ixm = grid[r][(c + 1) % renderedGridSize]["ox-"];
+              const iyp = grid[(r - 1 + renderedGridSize) % renderedGridSize][c]["oy+"];
+              const iym = grid[(r + 1) % renderedGridSize][c]["oy-"];
               const anyOn = cell["ox+"] || cell["oy+"] || cell["ox-"] || cell["oy-"];
 
               return (
@@ -490,6 +586,14 @@ export default function CosmicGrid4x4() {
           <SettingsPanel
             activePresetId={activePreset?.id ?? null}
             onSelectPreset={applyPreset}
+            currentGridSize={gridSize}
+            pendingGridSize={pendingGridSize}
+            onPendingGridSizeChange={(value) => {
+              setPendingGridSize(value);
+              if (gridSizeError) setGridSizeError("");
+            }}
+            onApplyGridSize={applyGridSize}
+            gridSizeError={gridSizeError}
           />
         )}
 
