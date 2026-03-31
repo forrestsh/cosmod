@@ -200,6 +200,19 @@ function getPresetForRule(rule) {
   return null;
 }
 
+function mapSearchRuleToGrid4x4Rule(searchRuleTable) {
+  // magic-search index: [right ox-, bottom oy-, left ox+, top oy+]
+  // this model index:  [left ox+, top oy+, right ox-, bottom oy-]
+  return Array.from({ length: 16 }, (_, gridIndex) => {
+    const c = (gridIndex >> 3) & 1;
+    const d = (gridIndex >> 2) & 1;
+    const a = (gridIndex >> 1) & 1;
+    const b = gridIndex & 1;
+    const searchIndex = (a << 3) | (b << 2) | (c << 1) | d;
+    return searchRuleTable[searchIndex];
+  });
+}
+
 function parseRuleFilePayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Rule file must contain a JSON object.");
@@ -217,12 +230,51 @@ function parseRuleFilePayload(payload) {
     throw new Error("Rule array must contain exactly 16 output values.");
   }
 
-  return payload.rule.map((entry, idx) => {
+  let parsedRule = payload.rule.map((entry, idx) => {
     if (!Number.isInteger(entry) || entry < 0 || entry > 15) {
       throw new Error(`Invalid rule value at index ${idx}; expected an integer from 0 to 15.`);
     }
     return entry;
   });
+
+  // Backward compatibility for early CM-8 exports that wrote magic-search ordering.
+  if (
+    payload.source === "cosmic-magic-search" &&
+    payload.ruleEncoding !== "cosmic-grid-4x4-step-index"
+  ) {
+    parsedRule = mapSearchRuleToGrid4x4Rule(parsedRule);
+  }
+
+  let initialValues = null;
+  if (payload.initialValues !== undefined) {
+    if (!Array.isArray(payload.initialValues) || payload.initialValues.length !== 4) {
+      throw new Error("`initialValues` must be a 4x4 array of integers from 0 to 15.");
+    }
+    initialValues = payload.initialValues.map((row, rowIdx) => {
+      if (!Array.isArray(row) || row.length !== 4) {
+        throw new Error(`\`initialValues\` row ${rowIdx} must contain exactly 4 entries.`);
+      }
+      return row.map((value, colIdx) => {
+        if (!Number.isInteger(value) || value < 0 || value > 15) {
+          throw new Error(
+            `Invalid initial value at [${rowIdx},${colIdx}]; expected an integer from 0 to 15.`
+          );
+        }
+        return value;
+      });
+    });
+  }
+
+  return { rule: parsedRule, initialValues };
+}
+
+function packedValueToCellSignals(value) {
+  return {
+    "ox+": (value >> 3) & 1,
+    "oy+": (value >> 2) & 1,
+    "ox-": (value >> 1) & 1,
+    "oy-": value & 1,
+  };
 }
 
 function SettingsPanel({
@@ -462,6 +514,7 @@ export default function CosmicGrid4x4() {
   const [paintVal, setPaintVal] = useState(1);
   const [ruleFileStatus, setRuleFileStatus] = useState(null);
   const intervalRef = useRef(null);
+  const importedGridRef = useRef(null);
   const activePreset = getPresetForRule(rule);
 
   const applyPreset = useCallback((presetId) => {
@@ -495,9 +548,24 @@ export default function CosmicGrid4x4() {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      const importedRule = parseRuleFilePayload(parsed);
-      setRule(importedRule);
-      setRuleFileStatus({ type: "success", text: `Rule loaded from ${file.name}.` });
+      const imported = parseRuleFilePayload(parsed);
+      setRule(imported.rule);
+      if (imported.initialValues) {
+        const importedGrid = imported.initialValues.map((row) =>
+          row.map((value) => packedValueToCellSignals(value))
+        );
+        importedGridRef.current = importedGrid;
+        setGridSize(4);
+        setPendingGridSize("4");
+        setTick(0);
+        setRunning(false);
+      }
+      setRuleFileStatus({
+        type: "success",
+        text: imported.initialValues
+          ? `Rule and initial values loaded from ${file.name}.`
+          : `Rule loaded from ${file.name}.`,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load rule JSON.";
       setRuleFileStatus({ type: "error", text: message });
@@ -526,7 +594,12 @@ export default function CosmicGrid4x4() {
   }, [rule]);
 
   useEffect(() => {
-    setGrid(makeEmpty(gridSize));
+    if (importedGridRef.current && importedGridRef.current.length === gridSize) {
+      setGrid(importedGridRef.current.map((row) => row.map((cell) => ({ ...cell }))));
+      importedGridRef.current = null;
+    } else {
+      setGrid(makeEmpty(gridSize));
+    }
     setTick(0);
     setRunning(false);
   }, [gridSize]);
