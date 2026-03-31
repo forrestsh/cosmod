@@ -33,6 +33,8 @@ const RULE_PRESETS = [
 ];
 
 const DEFAULT_RULE = createIdentityRule();
+const RULE_FILE_VERSION = 1;
+const RULE_FILE_MODEL = "cosmic-grid-4x4";
 
 const DEFAULT_GRID_SIZE = 10;
 const MIN_GRID_SIZE = 1;
@@ -198,6 +200,31 @@ function getPresetForRule(rule) {
   return null;
 }
 
+function parseRuleFilePayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Rule file must contain a JSON object.");
+  }
+  if (payload.model !== RULE_FILE_MODEL) {
+    throw new Error("This file is not a Cosmic Grid 4x4 rule.");
+  }
+  if (payload.version !== RULE_FILE_VERSION) {
+    throw new Error(`Unsupported rule file version: ${payload.version ?? "missing"}.`);
+  }
+  if (!Array.isArray(payload.rule)) {
+    throw new Error("Rule file is missing the `rule` array.");
+  }
+  if (payload.rule.length !== 16) {
+    throw new Error("Rule array must contain exactly 16 output values.");
+  }
+
+  return payload.rule.map((entry, idx) => {
+    if (!Number.isInteger(entry) || entry < 0 || entry > 15) {
+      throw new Error(`Invalid rule value at index ${idx}; expected an integer from 0 to 15.`);
+    }
+    return entry;
+  });
+}
+
 function SettingsPanel({
   activePresetId,
   onSelectPreset,
@@ -319,7 +346,16 @@ function SettingsPanel({
   );
 }
 
-function RuleEditor({ rule, onRuleChange }) {
+function RuleEditor({ rule, onRuleChange, onSaveRule, onLoadRuleFile, ruleFileStatus }) {
+  const fileInputRef = useRef(null);
+
+  const triggerLoadRule = () => {
+    if (!fileInputRef.current) return;
+    // Allow selecting the same file repeatedly.
+    fileInputRef.current.value = "";
+    fileInputRef.current.click();
+  };
+
   return (
     <div style={{
       background: "#0d1117", border: "1px solid #30363d",
@@ -327,9 +363,48 @@ function RuleEditor({ rule, onRuleChange }) {
       fontFamily: "monospace", color: "#c9d1d9", maxHeight: 320,
       overflowY: "auto", minWidth: 310
     }}>
-      <div style={{ color: "#8b949e", marginBottom: 8, fontSize: 10, letterSpacing: 1 }}>
-        RULE TABLE  (click output bits to toggle)
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div style={{ color: "#8b949e", fontSize: 10, letterSpacing: 1 }}>
+          RULE TABLE  (click output bits to toggle)
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={onSaveRule}
+            style={{ ...btnStyle("#58a6ff"), padding: "4px 8px", fontSize: 10 }}
+          >
+            Save JSON
+          </button>
+          <button
+            onClick={triggerLoadRule}
+            style={{ ...btnStyle("#69ff47"), padding: "4px 8px", fontSize: 10 }}
+          >
+            Load JSON
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                onLoadRuleFile(file);
+              }
+            }}
+          />
+        </div>
       </div>
+      {ruleFileStatus ? (
+        <div
+          style={{
+            marginBottom: 8,
+            fontSize: 10,
+            color: ruleFileStatus.type === "error" ? "#ff7b72" : "#3fb950",
+          }}
+        >
+          {ruleFileStatus.text}
+        </div>
+      ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "auto auto auto", gap: "2px 10px", alignItems: "center" }}>
         <span style={{ color: "#8b949e", fontSize: 10 }}>IN (ix+ iy+ ix- iy-)</span>
         <span style={{ color: "#8b949e", fontSize: 10 }}>→</span>
@@ -338,7 +413,7 @@ function RuleEditor({ rule, onRuleChange }) {
           const inBits = [(idx >> 3) & 1, (idx >> 2) & 1, (idx >> 1) & 1, idx & 1];
           const outBits = [(out >> 3) & 1, (out >> 2) & 1, (out >> 1) & 1, out & 1];
           return (
-            <>
+            <span key={idx} style={{ display: "contents" }}>
               <span key={`in${idx}`} style={{ color: "#58a6ff" }}>
                 {inBits.map((b, i) => (
                   <span key={i} style={{ color: b ? SIG_COLOR[SIG_ORDER[i]] : "#30363d", marginRight: 3 }}>{b}</span>
@@ -363,7 +438,7 @@ function RuleEditor({ rule, onRuleChange }) {
                   >{b}</span>
                 ))}
               </span>
-            </>
+            </span>
           );
         })}
       </div>
@@ -385,6 +460,7 @@ export default function CosmicGrid4x4() {
   const [showSettings, setShowSettings] = useState(false);
   const [paintSig, setPaintSig] = useState("ox+");
   const [paintVal, setPaintVal] = useState(1);
+  const [ruleFileStatus, setRuleFileStatus] = useState(null);
   const intervalRef = useRef(null);
   const activePreset = getPresetForRule(rule);
 
@@ -392,6 +468,40 @@ export default function CosmicGrid4x4() {
     const preset = RULE_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     setRule(preset.build());
+    setRuleFileStatus(null);
+  }, []);
+
+  const saveRuleAsJson = useCallback(() => {
+    const payload = {
+      version: RULE_FILE_VERSION,
+      model: RULE_FILE_MODEL,
+      savedAt: new Date().toISOString(),
+      rule: [...rule],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cosmic-grid-4x4-rule-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setRuleFileStatus({ type: "success", text: "Rule exported as JSON." });
+  }, [rule]);
+
+  const loadRuleFromJson = useCallback(async (file) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const importedRule = parseRuleFilePayload(parsed);
+      setRule(importedRule);
+      setRuleFileStatus({ type: "success", text: `Rule loaded from ${file.name}.` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load rule JSON.";
+      setRuleFileStatus({ type: "error", text: message });
+    }
   }, []);
 
   const applyGridSize = useCallback(() => {
@@ -598,7 +708,20 @@ export default function CosmicGrid4x4() {
         )}
 
         {/* Rule editor */}
-        {showRule && <RuleEditor rule={rule} onRuleChange={setRule} />}
+        {showRule && (
+          <RuleEditor
+            rule={rule}
+            onRuleChange={(nextRule) => {
+              setRule(nextRule);
+              if (ruleFileStatus?.type === "error") {
+                setRuleFileStatus(null);
+              }
+            }}
+            onSaveRule={saveRuleAsJson}
+            onLoadRuleFile={loadRuleFromJson}
+            ruleFileStatus={ruleFileStatus}
+          />
+        )}
       </div>
 
       <div style={{ marginTop: 16, fontSize: 10, color: "#30363d", letterSpacing: 1 }}>
