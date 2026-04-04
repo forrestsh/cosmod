@@ -219,6 +219,44 @@ export default function HomePage() {
             4x4 magic square.
           </span>
         </Link>
+        <a
+          href="/books/"
+          style={cardBase}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#4ee4a3";
+            e.currentTarget.style.background = "#151820";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "#2a2e38";
+            e.currentTarget.style.background = "#12141a";
+          }}
+        >
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#e0e4e8",
+            }}
+          >
+            Book: Cosmic Grid
+          </span>
+          <span
+            style={{
+              display: "block",
+              marginTop: "10px",
+              fontSize: "11px",
+              color: "#6a7078",
+              lineHeight: 1.45,
+              letterSpacing: "0.02em",
+              textTransform: "none",
+            }}
+          >
+            Read the full book online — a unified framework of physics,
+            consciousness, and the Creator. Available in English and Chinese.
+          </span>
+        </a>
       </nav>
     </div>
   );
