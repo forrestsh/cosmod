@@ -7,8 +7,12 @@ import json
 import re
 import os
 import html
+import shutil
 
 SITE_DIR = os.path.join(os.path.dirname(__file__), "site")
+# Also output to public/books/ for Vercel deployment
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PUBLIC_BOOKS_DIR = os.path.join(PROJECT_ROOT, "public", "books")
 
 # Chapter metadata for both languages (matched by index)
 CHAPTER_SLUGS = [
@@ -341,7 +345,13 @@ def main():
     with open(os.path.join(SITE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(index_html(en_chapters, zh_chapters))
 
+    # Copy to public/books/ for Vercel
+    if os.path.exists(PUBLIC_BOOKS_DIR):
+        shutil.rmtree(PUBLIC_BOOKS_DIR)
+    shutil.copytree(SITE_DIR, PUBLIC_BOOKS_DIR)
+
     print(f"Generated {len(en_chapters)} chapter pages + index in {SITE_DIR}/")
+    print(f"Copied to {PUBLIC_BOOKS_DIR}/ for Vercel deployment")
 
 
 if __name__ == "__main__":
