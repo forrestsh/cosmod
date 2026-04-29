@@ -307,9 +307,49 @@
     .readout .value { font-size: 12px; }
     .rule-card { min-width: 145px; }
   }
+
+  /* ===== Site nav (Home / Manual) ===== */
+  .site-nav {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 10000;
+    display: flex;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  /* push title-block down to make room for the nav row */
+  .topbar { padding-top: 48px; }
+  .site-nav a {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #5fc9a0;
+    text-decoration: none;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: rgba(8, 12, 10, 0.85);
+    border: 1px solid rgba(95,201,160,0.35);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .site-nav a:hover {
+    background: rgba(20, 30, 24, 0.95);
+    border-color: rgba(95,201,160,0.7);
+  }
+  @media (min-width: 720px) {
+    .site-nav { top: 16px; left: 22px; gap: 10px; }
+    .site-nav a { font-size: 11px; padding: 8px 12px; }
+  }
 </style>
 </head>
 <body>
+
+<nav class="site-nav">
+  <a href="/" title="Back to home">← Home</a>
+  <a href="./manual.html" title="Read the manual">Manual</a>
+</nav>
 
 <div id="app">
 
