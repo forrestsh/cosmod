@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/((?!assets/|books/).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|books/|crystal-garden/).*)", "destination": "/index.html" }
   ]
 }
