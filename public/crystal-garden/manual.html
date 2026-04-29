@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crystal Garden v0.13 — Manual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #050608;
+    color: #c8d4d0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+  }
+
+  /* ===== Site nav (Home / Crystal Garden) ===== */
+  .site-nav {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10000;
+    display: flex;
+    gap: 8px;
+  }
+  .site-nav a {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #5fc9a0;
+    text-decoration: none;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: rgba(8, 12, 10, 0.85);
+    border: 1px solid rgba(95,201,160,0.35);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .site-nav a:hover {
+    background: rgba(20, 30, 24, 0.95);
+    border-color: rgba(95,201,160,0.7);
+  }
+  @media (min-width: 720px) {
+    .site-nav { top: 16px; right: 18px; gap: 10px; }
+    .site-nav a { font-size: 11px; padding: 8px 12px; }
+  }
+
+  /* ===== Markdown content ===== */
+  #content h1, #content h2, #content h3, #content h4 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+    color: #d4e8de;
+    line-height: 1.2;
+    margin: 1.8em 0 0.6em;
+  }
+  #content h1 {
+    font-size: 36px;
+    font-style: italic;
+    margin-top: 0;
+    border-bottom: 1px solid rgba(95,201,160,0.2);
+    padding-bottom: 0.3em;
+  }
+  #content h2 {
+    font-size: 26px;
+    color: #5fc9a0;
+    border-bottom: 1px solid rgba(95,201,160,0.15);
+    padding-bottom: 0.2em;
+  }
+  #content h3 { font-size: 20px; color: #b8d4ca; }
+  #content h4 { font-size: 16px; color: #8eb8a8; }
+
+  #content p {
+    margin: 0.9em 0;
+    color: #c8d4d0;
+  }
+
+  #content strong { color: #d4e8de; font-weight: 700; }
+  #content em { color: #b8d4ca; font-style: italic; }
+
+  #content a {
+    color: #5fc9a0;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(95,201,160,0.4);
+  }
+  #content a:hover { border-bottom-color: #5fc9a0; }
+
+  #content code {
+    background: rgba(95,201,160,0.1);
+    color: #5fc9a0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  #content pre {
+    background: #0c1010;
+    border: 1px solid rgba(95,201,160,0.15);
+    border-radius: 6px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    margin: 1.2em 0;
+  }
+  #content pre code {
+    background: transparent;
+    color: #c8d4d0;
+    padding: 0;
+  }
+
+  #content ul, #content ol {
+    margin: 0.9em 0;
+    padding-left: 1.5em;
+  }
+  #content li { margin: 0.3em 0; }
+
+  #content blockquote {
+    border-left: 3px solid rgba(95,201,160,0.5);
+    background: rgba(95,201,160,0.05);
+    margin: 1.2em 0;
+    padding: 0.8em 1.2em;
+    color: #b8d4ca;
+    font-style: italic;
+  }
+
+  #content hr {
+    border: none;
+    border-top: 1px solid rgba(95,201,160,0.2);
+    margin: 2.4em 0;
+  }
+
+  #content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.2em 0;
+    font-size: 13px;
+  }
+  #content th, #content td {
+    border: 1px solid rgba(95,201,160,0.2);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  #content thead th {
+    background: rgba(95,201,160,0.1);
+    color: #5fc9a0;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+  #content tbody tr:nth-child(even) {
+    background: rgba(95,201,160,0.03);
+  }
+
+  #loading, #error {
+    color: #5a7068;
+    text-align: center;
+    padding: 80px 20px;
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  #error { color: #c97070; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="/" title="Back to home">← Home</a>
+  <a href="./index.html" title="Open Crystal Garden">Crystal Garden</a>
+</nav>
+
+<div class="container">
+  <div id="loading">Loading manual…</div>
+  <article id="content" style="display:none"></article>
+  <div id="error" style="display:none">Failed to load README.md</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  (async function () {
+    const loading = document.getElementById("loading");
+    const content = document.getElementById("content");
+    const errorEl = document.getElementById("error");
+    try {
+      const resp = await fetch("./README.md");
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const md = await resp.text();
+      content.innerHTML = marked.parse(md);
+      loading.style.display = "none";
+      content.style.display = "";
+      // Set page title from first H1
+      const h1 = content.querySelector("h1");
+      if (h1) document.title = h1.textContent.trim() + " — Manual";
+    } catch (e) {
+      console.error(e);
+      loading.style.display = "none";
+      errorEl.style.display = "";
+      errorEl.textContent = "Failed to load README.md: " + e.message;
+    }
+  })();
+</script>
+
+</body>
+</html>
