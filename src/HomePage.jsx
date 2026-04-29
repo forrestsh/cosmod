@@ -220,7 +220,7 @@ export default function HomePage() {
           </span>
         </Link>
         <a
-          href="/crystal-garden/"
+          href="/crystal-garden/index.html"
           style={cardBase}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = "#4ee4a3";
@@ -259,7 +259,7 @@ export default function HomePage() {
           </span>
         </a>
         <a
-          href="/books/"
+          href="/books/index.html"
           style={cardBase}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = "#4ee4a3";
