@@ -220,7 +220,46 @@ export default function HomePage() {
           </span>
         </Link>
         <a
-          href="/books/"
+          href="/crystal-garden/index.html"
+          style={cardBase}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#4ee4a3";
+            e.currentTarget.style.background = "#151820";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "#2a2e38";
+            e.currentTarget.style.background = "#12141a";
+          }}
+        >
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#e0e4e8",
+            }}
+          >
+            Crystal Garden v0.13
+          </span>
+          <span
+            style={{
+              display: "block",
+              marginTop: "10px",
+              fontSize: "11px",
+              color: "#6a7078",
+              lineHeight: 1.45,
+              letterSpacing: "0.02em",
+              textTransform: "none",
+            }}
+          >
+            59 rules across 7 algorithm stages on a 40³ FCC lattice — from
+            single-seed Oh crystals through the 26-letter alphabet to a real
+            3D toy-dog mesh (89% recall).
+          </span>
+        </a>
+        <a
+          href="/books/index.html"
           style={cardBase}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = "#4ee4a3";
