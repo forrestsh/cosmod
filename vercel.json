@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/((?!assets/|books/|crystal-garden/).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|books/|crystal-garden/|cosmic-grid-particles/).*)", "destination": "/index.html" }
   ]
 }

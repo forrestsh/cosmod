@@ -4,6 +4,7 @@ import HexCosmicGrid from "../hex-cosmic-grid.jsx";
 import CosmicGrid from "../cosmic-grid-toroidal.jsx";
 import CosmicGrid4x4 from "../cosmic-grid-4x4.jsx";
 import CosmicMagicSearch from "../cosmic-magic-search.jsx";
+import CosmicGridParticles from "../cosmic-grid-particles.jsx";
 
 const font =
   "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace";
@@ -77,6 +78,14 @@ export default function App() {
         element={
           <ModelShell>
             <CosmicMagicSearch />
+          </ModelShell>
+        }
+      />
+      <Route
+        path="/particles"
+        element={
+          <ModelShell>
+            <CosmicGridParticles />
           </ModelShell>
         }
       />
