@@ -219,6 +219,45 @@ export default function HomePage() {
             4x4 magic square.
           </span>
         </Link>
+        <Link
+          to="/particles"
+          style={cardBase}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#4ee4a3";
+            e.currentTarget.style.background = "#151820";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "#2a2e38";
+            e.currentTarget.style.background = "#12141a";
+          }}
+        >
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#e0e4e8",
+            }}
+          >
+            Cosmic Grid Particles
+          </span>
+          <span
+            style={{
+              display: "block",
+              marginTop: "10px",
+              fontSize: "11px",
+              color: "#6a7078",
+              lineHeight: 1.45,
+              letterSpacing: "0.02em",
+              textTransform: "none",
+            }}
+          >
+            Five scripted scenarios on the FCC 12-direction lattice — baryon
+            heartbeat, B+b annihilation, full collision (Compton + core +
+            ignition), light-speed gun, and the 6-cycle colour wheel.
+          </span>
+        </Link>
         <a
           href="/crystal-garden/index.html"
           style={cardBase}
