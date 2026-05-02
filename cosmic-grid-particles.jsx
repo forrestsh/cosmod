@@ -503,8 +503,8 @@ export default function FCCParticleViz() {
   return (
     <div style={{
       width: '100%',
-      height: '100vh',          /* fallback for browsers without dvh */
-      maxHeight: '100dvh',      /* dynamic viewport: shrinks with mobile URL bar */
+      height: '100vh',
+      maxHeight: '900px',
       background: '#05050a',
       color: '#e8e8ed',
       fontFamily: '"IBM Plex Mono", "JetBrains Mono", "Menlo", monospace',
@@ -512,9 +512,9 @@ export default function FCCParticleViz() {
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* Top header — left padding clears the fixed ← Home pill from ModelShell */}
+      {/* Top header */}
       <div style={{
-        padding: '10px 14px 6px 96px',
+        padding: '10px 14px 6px',
         borderBottom: '1px solid #15151f',
         flexShrink: 0,
       }}>
@@ -603,46 +603,19 @@ export default function FCCParticleViz() {
           </div>
         </div>
 
-        {/* HUD top-right: help link + control hints */}
+        {/* HUD top-right: control hints */}
         <div style={{
           position: 'absolute',
           top: 10, right: 12,
+          fontSize: 9,
+          letterSpacing: 1.5,
+          color: '#3f3f4f',
+          textTransform: 'uppercase',
+          pointerEvents: 'none',
           textAlign: 'right',
           lineHeight: 1.6,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          gap: 6,
         }}>
-          <a
-            href="/cosmic-grid-particles/manual.html"
-            target="_blank"
-            rel="noopener"
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: 1.4,
-              color: '#fbbf24',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              padding: '5px 9px',
-              border: '1px solid #fbbf2455',
-              borderRadius: 4,
-              background: 'rgba(8,8,12,0.7)',
-              fontFamily: 'inherit',
-            }}
-          >
-            help ↗
-          </a>
-          <div style={{
-            fontSize: 9,
-            letterSpacing: 1.5,
-            color: '#3f3f4f',
-            textTransform: 'uppercase',
-            pointerEvents: 'none',
-          }}>
-            drag · rotate<br />pinch · zoom
-          </div>
+          drag · rotate<br />pinch · zoom
         </div>
 
         {/* Caption strip at bottom — annotation when present, otherwise scene description.
