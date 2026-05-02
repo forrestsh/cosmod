@@ -234,7 +234,10 @@ export default function FCCParticleViz() {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(w, h);
+    renderer.setSize(w, h, false);
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.display = 'block';
     mount.appendChild(renderer.domElement);
 
     // Lights
@@ -346,11 +349,18 @@ export default function FCCParticleViz() {
 
     const onResize = () => {
       const W = mount.clientWidth, H = mount.clientHeight;
+      if (!W || !H) return;
       camera.aspect = W / H;
       camera.updateProjectionMatrix();
-      renderer.setSize(W, H);
+      renderer.setSize(W, H, false); // false = don't override the canvas style
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
     };
     window.addEventListener('resize', onResize);
+    // ResizeObserver catches layout-only resizes that don't fire window.resize
+    // (orientation change, parent reflow, dynamic UI bars).
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null;
+    ro?.observe(mount);
 
     // Spin origin ring slowly
     let raf;
@@ -367,6 +377,7 @@ export default function FCCParticleViz() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      ro?.disconnect();
       el.removeEventListener('mousedown', onDown);
       el.removeEventListener('mousemove', onMove);
       el.removeEventListener('mouseup', onUp);
