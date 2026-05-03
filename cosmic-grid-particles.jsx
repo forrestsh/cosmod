@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 
 // =====================================================================
@@ -517,6 +518,7 @@ export default function FCCParticleViz() {
         padding: '10px 14px 6px',
         borderBottom: '1px solid #15151f',
         flexShrink: 0,
+        position: 'relative',
       }}>
         <div style={{
           fontSize: 9,
@@ -535,6 +537,52 @@ export default function FCCParticleViz() {
         }}>
           {SCENARIOS[scenarioKey].name}
         </div>
+        <nav style={{
+          position: 'absolute',
+          top: 10,
+          right: 14,
+          display: 'flex',
+          gap: 6,
+        }}>
+          <a
+            href="/cosmic-grid-particles/manual.html"
+            target="_blank"
+            rel="noopener"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              color: '#fbbf24',
+              textDecoration: 'none',
+              padding: '5px 9px',
+              border: '1px solid #fbbf2455',
+              borderRadius: 5,
+              background: 'rgba(8,8,12,0.6)',
+              fontFamily: 'inherit',
+            }}
+          >
+            Help ↗
+          </a>
+          <Link
+            to="/"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              color: '#4ee4a3',
+              textDecoration: 'none',
+              padding: '5px 9px',
+              border: '1px solid #2a2e38',
+              borderRadius: 5,
+              background: 'rgba(8,8,12,0.6)',
+              fontFamily: 'inherit',
+            }}
+          >
+            ← Home
+          </Link>
+        </nav>
       </div>
 
       {/* Scenario chips */}

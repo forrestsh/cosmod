@@ -9,30 +9,26 @@ import CosmicGridParticles from "../cosmic-grid-particles.jsx";
 const font =
   "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace";
 
-function HomeLink({ corner = "top-left" }) {
-  // For routes whose own UI lives in the top-left (e.g. /particles), use
-  // top-right with tighter styling so the link sits in the topbar's empty
-  // right edge instead of covering the page title.
-  const compact = corner === "top-right";
-  const positionStyle = compact
-    ? { top: 10, right: 14, fontSize: "10px", padding: "5px 8px" }
-    : { top: 14, left: 14, fontSize: "11px", padding: "8px 10px" };
+function HomeLink() {
   return (
     <Link
       to="/"
       style={{
         position: "fixed",
+        top: 14,
+        left: 14,
         zIndex: 10000,
+        fontSize: "11px",
         fontFamily: font,
         fontWeight: 600,
         letterSpacing: "0.14em",
         textTransform: "uppercase",
         color: "#4ee4a3",
         textDecoration: "none",
+        padding: "8px 10px",
         borderRadius: "6px",
         background: "rgba(8, 8, 12, 0.85)",
         border: "1px solid #2a2e38",
-        ...positionStyle,
       }}
     >
       ← Home
@@ -40,10 +36,10 @@ function HomeLink({ corner = "top-left" }) {
   );
 }
 
-function ModelShell({ children, homeCorner }) {
+function ModelShell({ children }) {
   return (
     <>
-      <HomeLink corner={homeCorner} />
+      <HomeLink />
       {children}
     </>
   );
@@ -85,14 +81,7 @@ export default function App() {
           </ModelShell>
         }
       />
-      <Route
-        path="/particles"
-        element={
-          <ModelShell homeCorner="top-right">
-            <CosmicGridParticles />
-          </ModelShell>
-        }
-      />
+      <Route path="/particles" element={<CosmicGridParticles />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
