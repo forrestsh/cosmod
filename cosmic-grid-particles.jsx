@@ -504,7 +504,7 @@ export default function FCCParticleViz() {
   return (
     <div style={{
       width: '100%',
-      height: '100vh',
+      height: '100dvh',
       maxHeight: '900px',
       background: '#05050a',
       color: '#e8e8ed',
