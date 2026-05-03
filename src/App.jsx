@@ -81,14 +81,7 @@ export default function App() {
           </ModelShell>
         }
       />
-      <Route
-        path="/particles"
-        element={
-          <ModelShell>
-            <CosmicGridParticles />
-          </ModelShell>
-        }
-      />
+      <Route path="/particles" element={<CosmicGridParticles />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
